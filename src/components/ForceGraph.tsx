@@ -15,9 +15,22 @@ interface SimulationNode extends d3.SimulationNodeDatum {
   id: string;
   name: string;
   group: string;
+  type: 'external' | 'project';
   hasConflict: boolean;
   level: number;
 }
+
+const starPath = (outer: number, inner: number): string => {
+  const points = 5;
+  const step = Math.PI / points;
+  let d = '';
+  for (let i = 0; i < 2 * points; i++) {
+    const r = i % 2 === 0 ? outer : inner;
+    const angle = i * step - Math.PI / 2;
+    d += (i === 0 ? 'M' : 'L') + (r * Math.cos(angle)) + ',' + (r * Math.sin(angle));
+  }
+  return d + 'Z';
+};
 
 interface SimulationLink extends d3.SimulationLinkDatum<SimulationNode> {
   source: string | SimulationNode;
@@ -26,22 +39,11 @@ interface SimulationLink extends d3.SimulationLinkDatum<SimulationNode> {
 
 const getBaseNodeColor = (node: SimulationNode): string => {
   if (node.hasConflict) return '#ef4444';
+  if (node.type === 'project') return '#8b5cf6';
   if (node.group.startsWith('androidx')) return '#10b981';
   if (node.group.startsWith('org.jetbrains')) return '#3b82f6';
   if (node.group.startsWith('com.google')) return '#f59e0b';
-  const colorMap: Record<string, string> = {
-    'person': '#3b82f6',
-    'organization': '#10b981',
-    'university': '#f97316',
-    'media': '#a855f7',
-    'platform': '#ec4899',
-    'authority': '#14b8a6',
-    'event': '#f59e0b',
-    'concept': '#8b5cf6',
-    'location': '#22c55e',
-    'conflict': '#dc2626',
-  };
-  return colorMap[node.group] || '#6366f1';
+  return '#6366f1';
 };
 
 export const ForceGraph: React.FC<ForceGraphProps> = ({
@@ -98,7 +100,7 @@ export const ForceGraph: React.FC<ForceGraphProps> = ({
         return (sourceId === selected || targetId === selected) ? 1 : 0.2;
       });
 
-    nodeSel.select('circle')
+    nodeSel.select('.node-shape')
       .attr('fill', (d: SimulationNode) => {
         if (!selected) return getBaseNodeColor(d);
         if (d.id === selected) return '#ef4444';
@@ -147,6 +149,7 @@ export const ForceGraph: React.FC<ForceGraphProps> = ({
       id: n.id,
       name: n.name,
       group: n.group,
+      type: n.type,
       hasConflict: n.hasConflict,
       level: n.level,
     }));
@@ -200,15 +203,20 @@ export const ForceGraph: React.FC<ForceGraphProps> = ({
       );
     nodeSelectionRef.current = nodeSel as unknown as d3.Selection<SVGGElement, SimulationNode, SVGGElement, unknown>;
 
-    nodeSel.append('circle')
-      .attr('r', 8)
-      .attr('fill', d => getBaseNodeColor(d))
-      .attr('stroke', '#fff')
-      .attr('stroke-width', 2)
-      .on('click', (event, d) => {
-        event.stopPropagation();
-        onNodeClickRef.current(d.id);
-      });
+    nodeSel.each(function(d) {
+      const el = d3.select(this);
+      const shape = d.type === 'project'
+        ? el.append('path').attr('d', starPath(10, 4.5)).attr('class', 'node-shape')
+        : el.append('circle').attr('r', 8).attr('class', 'node-shape');
+      shape
+        .attr('fill', getBaseNodeColor(d))
+        .attr('stroke', '#fff')
+        .attr('stroke-width', 2)
+        .on('click', (event: MouseEvent) => {
+          event.stopPropagation();
+          onNodeClickRef.current(d.id);
+        });
+    });
 
     nodeSel.append('text')
       .text(d => d.name.length > 20 ? d.name.slice(0, 20) + '...' : d.name)
