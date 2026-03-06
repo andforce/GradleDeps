@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { toPng } from 'html-to-image';
+import { ArrowLeft, Download } from 'lucide-react';
 import { ForceGraph } from './ForceGraph';
 import { NodeDetails } from './NodeDetails';
 import { SearchBar } from './SearchBar';
@@ -49,30 +50,33 @@ export const GraphVisualization: React.FC<GraphVisualizationProps> = ({ data, on
     : null;
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
-      <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+    <div className="h-screen flex flex-col bg-transparent">
+      <header className="bg-white/60 backdrop-blur-md border-b border-white/40 px-6 py-3 flex items-center justify-between z-10 shadow-sm">
         <div className="flex items-center space-x-4">
           <button
             onClick={onReset}
-            className="text-sm text-gray-600 hover:text-gray-800"
+            className="flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-blue-600 transition-colors bg-white/50 px-3 py-1.5 rounded-lg border border-slate-200/50 hover:bg-white/80"
           >
-            ← Back
+            <ArrowLeft className="w-4 h-4" />
+            Back
           </button>
-          <h1 className="font-semibold text-gray-800">Dependency Graph</h1>
+          <div className="h-6 w-px bg-slate-300/50"></div>
+          <h1 className="font-bold text-slate-800 tracking-tight">Dependency Graph</h1>
         </div>
 
         <div className="flex items-center space-x-4">
           <SearchBar nodes={data.nodes} onSelect={setSelectedNode} />
           <button
             onClick={handleExport}
-            className="px-4 py-2 bg-blue-500 text-white text-sm rounded hover:bg-blue-600"
+            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-sm font-medium rounded-lg hover:shadow-[0_0_15px_rgba(59,130,246,0.4)] transition-all hover:scale-105 active:scale-95"
           >
+            <Download className="w-4 h-4" />
             Export PNG
           </button>
         </div>
       </header>
 
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden relative">
         <div className="flex-1 relative" ref={graphRef}>
           <ForceGraph
             nodes={data.nodes}
@@ -83,15 +87,19 @@ export const GraphVisualization: React.FC<GraphVisualizationProps> = ({ data, on
             height={dimensions.height}
           />
 
-          <div className="absolute bottom-4 left-4">
-            <Legend />
+          <div className="absolute bottom-4 left-4 z-10 pointer-events-none">
+            <div className="pointer-events-auto">
+              <Legend />
+            </div>
           </div>
 
-          <div className="absolute top-4 left-4 w-72">
-            <ConflictPanel
-              conflicts={data.conflicts}
-              onSelectNode={setSelectedNode}
-            />
+          <div className="absolute top-4 left-4 w-72 z-10 pointer-events-none">
+            <div className="pointer-events-auto">
+              <ConflictPanel
+                conflicts={data.conflicts}
+                onSelectNode={setSelectedNode}
+              />
+            </div>
           </div>
         </div>
 
@@ -102,18 +110,29 @@ export const GraphVisualization: React.FC<GraphVisualizationProps> = ({ data, on
         />
       </div>
 
-      <footer className="bg-white border-t border-gray-200 px-4 py-2 text-sm text-gray-500">
-        <span>Nodes: {data.nodes.length}</span>
-        <span className="mx-4">|</span>
-        <span>Edges: {data.links.length}</span>
-        <span className="mx-4">|</span>
-        <span>Conflicts: {data.conflicts.length}</span>
-        {selectedNode && (
-          <>
-            <span className="mx-4">|</span>
-            <span>Selected: {selectedNode}</span>
-          </>
-        )}
+      <footer className="bg-white/60 backdrop-blur-md border-t border-white/40 px-6 py-2.5 text-sm font-medium text-slate-600 z-10 flex items-center shadow-[0_-1px_2px_rgba(0,0,0,0.02)]">
+        <div className="flex items-center gap-6">
+          <span className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-blue-400"></div>
+            Nodes: {data.nodes.length}
+          </span>
+          <span className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-slate-400"></div>
+            Edges: {data.links.length}
+          </span>
+          <span className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-red-400"></div>
+            Conflicts: {data.conflicts.length}
+          </span>
+          {selectedNode && (
+            <>
+              <div className="h-4 w-px bg-slate-300/50"></div>
+              <span className="text-blue-600 font-semibold bg-blue-50/50 px-2 py-0.5 rounded-md border border-blue-100/50">
+                Selected: {selectedNode}
+              </span>
+            </>
+          )}
+        </div>
       </footer>
     </div>
   );

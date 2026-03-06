@@ -1,1 +1,19 @@
 @import "tailwindcss";
+
+@theme {
+  --color-brand-50: #eff6ff;
+  --color-brand-100: #dbeafe;
+  --color-brand-500: #3b82f6;
+  --color-brand-600: #2563eb;
+}
+
+body {
+  @apply bg-slate-50 text-slate-900;
+  /* Subtle mesh background */
+  background-image: radial-gradient(at 40% 20%, hsla(210, 100%, 93%, 1) 0px, transparent 50%),
+                    radial-gradient(at 80% 0%, hsla(189, 100%, 96%, 1) 0px, transparent 50%),
+                    radial-gradient(at 0% 50%, hsla(210, 100%, 93%, 1) 0px, transparent 50%);
+  background-attachment: fixed;
+  background-size: cover;
+  min-height: 100vh;
+}

@@ -205,17 +205,22 @@ export const ForceGraph: React.FC<ForceGraphProps> = ({
 
     nodeSel.each(function(d) {
       const el = d3.select(this);
-      const shape = d.type === 'project'
-        ? el.append('path').attr('d', starPath(15, 6.75)).attr('class', 'node-shape')
-        : el.append('circle').attr('r', 8).attr('class', 'node-shape');
-      shape
-        .attr('fill', getBaseNodeColor(d))
-        .attr('stroke', '#fff')
-        .attr('stroke-width', 2)
-        .on('click', (event: MouseEvent) => {
-          event.stopPropagation();
-          onNodeClickRef.current(d.id);
-        });
+      const setupShape = (shape: any) => {
+        shape
+          .attr('fill', getBaseNodeColor(d))
+          .attr('stroke', '#fff')
+          .attr('stroke-width', 2)
+          .on('click', (event: MouseEvent) => {
+            event.stopPropagation();
+            onNodeClickRef.current(d.id);
+          });
+      };
+
+      if (d.type === 'project') {
+        setupShape(el.append('path').attr('d', starPath(15, 6.75)).attr('class', 'node-shape'));
+      } else {
+        setupShape(el.append('circle').attr('r', 8).attr('class', 'node-shape'));
+      }
     });
 
     nodeSel.append('text')
