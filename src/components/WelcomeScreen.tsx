@@ -68,7 +68,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onParse }) => {
           <ol className="list-decimal list-inside text-gray-600 space-y-2 mb-6">
             <li>Run in your Android project:</li>
             <code className="block bg-gray-100 p-3 rounded text-sm font-mono text-gray-800">
-              ./gradlew dependencies --configuration implementation &gt; deps.txt
+              ./gradlew :app:dependencies &gt; deps.txt
             </code>
             <li>Upload the file or paste the content below</li>
           </ol>
