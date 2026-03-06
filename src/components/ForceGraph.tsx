@@ -34,16 +34,77 @@ export const ForceGraph: React.FC<ForceGraphProps> = ({
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const connectedNodesRef = useRef<Set<string>>(new Set());
 
-  const getNodeColor = useCallback((node: SimulationNode) => {
+  // 计算与选中节点相连的节点集合
+  const updateConnectedNodes = useCallback(() => {
+    const connected = new Set<string>();
     if (selectedNode) {
-      return node.id === selectedNode ? '#ef4444' : '#9ca3af';
+      connected.add(selectedNode);
+      links.forEach(link => {
+        const sourceId = typeof link.source === 'string' ? link.source : (link.source as SimulationNode).id;
+        const targetId = typeof link.target === 'string' ? link.target : (link.target as SimulationNode).id;
+        if (sourceId === selectedNode) {
+          connected.add(targetId);
+        } else if (targetId === selectedNode) {
+          connected.add(sourceId);
+        }
+      });
     }
-    if (node.hasConflict) return '#ef4444';
-    if (node.group.startsWith('androidx')) return '#10b981';
-    if (node.group.startsWith('org.jetbrains')) return '#3b82f6';
-    if (node.group.startsWith('com.google')) return '#f59e0b';
-    return '#6366f1';
+    connectedNodesRef.current = connected;
+  }, [selectedNode, links]);
+
+  // 获取节点的分类颜色
+  const getBaseNodeColor = useCallback((node: SimulationNode): string => {
+    if (node.hasConflict) return '#ef4444'; // 红色 - 冲突
+    if (node.group.startsWith('androidx')) return '#10b981'; // 绿色
+    if (node.group.startsWith('org.jetbrains')) return '#3b82f6'; // 蓝色
+    if (node.group.startsWith('com.google')) return '#f59e0b'; // 橙色
+    // 为其他 group 分配更多颜色
+    const colorMap: Record<string, string> = {
+      'person': '#3b82f6',      // 蓝色 - 个人
+      'organization': '#10b981', // 绿色 - 组织/机构
+      'university': '#f97316',   // 橙色 - 高校
+      'media': '#a855f7',        // 紫色 - 媒体
+      'platform': '#ec4899',     // 粉色 - 平台
+      'authority': '#14b8a6',    // 青色 - 权威机构
+      'event': '#f59e0b',        // 琥珀色 - 事件
+      'concept': '#8b5cf6',      // 紫罗兰 - 概念
+      'location': '#22c55e',     // 绿色 - 地点
+      'conflict': '#dc2626',     // 深红色 - 冲突
+    };
+    return colorMap[node.group] || '#6366f1'; // 默认靛蓝色
+  }, []);
+
+  // 获取节点填充颜色 - 选中节点红色，相连节点彩色，其他灰色
+  const getNodeColor = useCallback((node: SimulationNode) => {
+    if (!selectedNode) {
+      return getBaseNodeColor(node);
+    }
+    const connected = connectedNodesRef.current;
+    if (node.id === selectedNode) {
+      return '#ef4444'; // 选中节点 - 红色
+    }
+    if (connected.has(node.id)) {
+      return getBaseNodeColor(node); // 相连节点 - 分类颜色
+    }
+    return '#9ca3af'; // 其他节点 - 灰色
+  }, [selectedNode, getBaseNodeColor]);
+
+  // 获取节点边框颜色
+  const getNodeStroke = useCallback((node: SimulationNode) => {
+    if (selectedNode && node.id === selectedNode) {
+      return '#b91c1c'; // 选中节点边框为深红色
+    }
+    return '#fff'; // 默认白色边框
+  }, [selectedNode]);
+
+  // 获取节点边框宽度
+  const getNodeStrokeWidth = useCallback((node: SimulationNode) => {
+    if (selectedNode && node.id === selectedNode) {
+      return 3; // 选中节点边框加粗
+    }
+    return 2; // 默认边框宽度
   }, [selectedNode]);
 
   const getLinkColor = useCallback((link: SimulationLink) => {
@@ -72,6 +133,9 @@ export const ForceGraph: React.FC<ForceGraphProps> = ({
 
   useEffect(() => {
     if (!svgRef.current || nodes.length === 0) return;
+
+    // 更新相连节点集合
+    updateConnectedNodes();
 
     const svg = d3.select(svgRef.current);
     svg.selectAll('*').remove();
@@ -143,8 +207,8 @@ export const ForceGraph: React.FC<ForceGraphProps> = ({
     node.append('circle')
       .attr('r', 8)
       .attr('fill', getNodeColor)
-      .attr('stroke', '#fff')
-      .attr('stroke-width', 2)
+      .attr('stroke', getNodeStroke)
+      .attr('stroke-width', getNodeStrokeWidth)
       .on('click', (event, d) => {
         event.stopPropagation();
         onNodeClick(d.id);
@@ -174,10 +238,13 @@ export const ForceGraph: React.FC<ForceGraphProps> = ({
       node.attr('transform', d => `translate(${d.x},${d.y})`);
 
       node.select('circle')
-        .attr('fill', getNodeColor);
+        .attr('fill', getNodeColor)
+        .attr('stroke', getNodeStroke)
+        .attr('stroke-width', getNodeStrokeWidth);
 
       node.select('text')
-        .attr('fill', selectedNode ? (d => (d as SimulationNode).id === selectedNode ? '#374151' : '#9ca3af') : '#374151');
+        .attr('fill', selectedNode ? (d => (d as SimulationNode).id === selectedNode ? '#1f2937' : '#6b7280') : '#374151')
+        .attr('font-weight', selectedNode ? (d => (d as SimulationNode).id === selectedNode ? '600' : 'normal') : 'normal');
     });
 
     svg.on('click', () => {
@@ -187,7 +254,7 @@ export const ForceGraph: React.FC<ForceGraphProps> = ({
     return () => {
       simulation.stop();
     };
-  }, [nodes, links, selectedNode, onNodeClick, width, height, getNodeColor, getLinkColor, getLinkOpacity]);
+  }, [nodes, links, selectedNode, onNodeClick, width, height, updateConnectedNodes, getNodeColor, getNodeStroke, getNodeStrokeWidth, getLinkColor, getLinkOpacity]);
 
   return (
     <div ref={containerRef} className="w-full h-full">
