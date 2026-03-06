@@ -39,7 +39,7 @@ interface SimulationLink extends d3.SimulationLinkDatum<SimulationNode> {
 
 const getBaseNodeColor = (node: SimulationNode): string => {
   if (node.hasConflict) return '#ef4444';
-  if (node.type === 'project') return '#8b5cf6';
+  if (node.type === 'project') return '#ec4899';
   if (node.group.startsWith('androidx')) return '#10b981';
   if (node.group.startsWith('org.jetbrains')) return '#3b82f6';
   if (node.group.startsWith('com.google')) return '#f59e0b';
@@ -206,7 +206,7 @@ export const ForceGraph: React.FC<ForceGraphProps> = ({
     nodeSel.each(function(d) {
       const el = d3.select(this);
       const shape = d.type === 'project'
-        ? el.append('path').attr('d', starPath(10, 4.5)).attr('class', 'node-shape')
+        ? el.append('path').attr('d', starPath(15, 6.75)).attr('class', 'node-shape')
         : el.append('circle').attr('r', 8).attr('class', 'node-shape');
       shape
         .attr('fill', getBaseNodeColor(d))

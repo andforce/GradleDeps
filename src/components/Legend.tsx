@@ -12,7 +12,7 @@ const items: LegendItem[] = [
   { color: '#3b82f6', label: 'Kotlin/JetBrains' },
   { color: '#f59e0b', label: 'Google' },
   { color: '#6366f1', label: 'Other' },
-  { color: '#8b5cf6', label: 'Project', shape: 'star' },
+  { color: '#ec4899', label: 'Project', shape: 'star' },
 ];
 
 const StarIcon: React.FC<{ color: string }> = ({ color }) => (
