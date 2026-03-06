@@ -110,9 +110,10 @@ export const ForceGraph: React.FC<ForceGraphProps> = ({
 
     const link = g.append('g')
       .attr('stroke-linecap', 'round')
-      .selectAll('line')
+      .selectAll('path')
       .data(simulationLinks)
-      .join('line')
+      .join('path')
+      .attr('fill', 'none')
       .attr('stroke', getLinkColor)
       .attr('stroke-opacity', getLinkOpacity)
       .attr('stroke-width', 1.5);
@@ -159,10 +160,14 @@ export const ForceGraph: React.FC<ForceGraphProps> = ({
 
     simulation.on('tick', () => {
       link
-        .attr('x1', d => (d.source as SimulationNode).x!)
-        .attr('y1', d => (d.source as SimulationNode).y!)
-        .attr('x2', d => (d.target as SimulationNode).x!)
-        .attr('y2', d => (d.target as SimulationNode).y!)
+        .attr('d', (d) => {
+          const source = d.source as SimulationNode;
+          const target = d.target as SimulationNode;
+          const dx = target.x! - source.x!;
+          const dy = target.y! - source.y!;
+          const dr = Math.sqrt(dx * dx + dy * dy);
+          return `M${source.x},${source.y}A${dr},${dr} 0 0,1 ${target.x},${target.y}`;
+        })
         .attr('stroke', getLinkColor)
         .attr('stroke-opacity', getLinkOpacity);
 
