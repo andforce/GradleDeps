@@ -24,6 +24,26 @@ interface SimulationLink extends d3.SimulationLinkDatum<SimulationNode> {
   target: string | SimulationNode;
 }
 
+const getBaseNodeColor = (node: SimulationNode): string => {
+  if (node.hasConflict) return '#ef4444';
+  if (node.group.startsWith('androidx')) return '#10b981';
+  if (node.group.startsWith('org.jetbrains')) return '#3b82f6';
+  if (node.group.startsWith('com.google')) return '#f59e0b';
+  const colorMap: Record<string, string> = {
+    'person': '#3b82f6',
+    'organization': '#10b981',
+    'university': '#f97316',
+    'media': '#a855f7',
+    'platform': '#ec4899',
+    'authority': '#14b8a6',
+    'event': '#f59e0b',
+    'concept': '#8b5cf6',
+    'location': '#22c55e',
+    'conflict': '#dc2626',
+  };
+  return colorMap[node.group] || '#6366f1';
+};
+
 export const ForceGraph: React.FC<ForceGraphProps> = ({
   nodes,
   links,
@@ -34,121 +54,94 @@ export const ForceGraph: React.FC<ForceGraphProps> = ({
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const connectedNodesRef = useRef<Set<string>>(new Set());
+  const selectedNodeRef = useRef<string | null>(null);
+  const onNodeClickRef = useRef(onNodeClick);
+  const linkSelectionRef = useRef<d3.Selection<SVGPathElement, SimulationLink, SVGGElement, unknown> | null>(null);
+  const nodeSelectionRef = useRef<d3.Selection<SVGGElement, SimulationNode, SVGGElement, unknown> | null>(null);
+  const simulationLinksRef = useRef<SimulationLink[]>([]);
 
-  // 计算与选中节点相连的节点集合
-  const updateConnectedNodes = useCallback(() => {
+  selectedNodeRef.current = selectedNode;
+  onNodeClickRef.current = onNodeClick;
+
+  const computeConnectedNodes = useCallback((selected: string | null, simLinks: SimulationLink[]): Set<string> => {
     const connected = new Set<string>();
-    if (selectedNode) {
-      connected.add(selectedNode);
-      links.forEach(link => {
+    if (selected) {
+      connected.add(selected);
+      simLinks.forEach(link => {
         const sourceId = typeof link.source === 'string' ? link.source : (link.source as SimulationNode).id;
         const targetId = typeof link.target === 'string' ? link.target : (link.target as SimulationNode).id;
-        if (sourceId === selectedNode) {
-          connected.add(targetId);
-        } else if (targetId === selectedNode) {
-          connected.add(sourceId);
-        }
+        if (sourceId === selected) connected.add(targetId);
+        else if (targetId === selected) connected.add(sourceId);
       });
     }
-    connectedNodesRef.current = connected;
-  }, [selectedNode, links]);
-
-  // 获取节点的分类颜色
-  const getBaseNodeColor = useCallback((node: SimulationNode): string => {
-    if (node.hasConflict) return '#ef4444'; // 红色 - 冲突
-    if (node.group.startsWith('androidx')) return '#10b981'; // 绿色
-    if (node.group.startsWith('org.jetbrains')) return '#3b82f6'; // 蓝色
-    if (node.group.startsWith('com.google')) return '#f59e0b'; // 橙色
-    // 为其他 group 分配更多颜色
-    const colorMap: Record<string, string> = {
-      'person': '#3b82f6',      // 蓝色 - 个人
-      'organization': '#10b981', // 绿色 - 组织/机构
-      'university': '#f97316',   // 橙色 - 高校
-      'media': '#a855f7',        // 紫色 - 媒体
-      'platform': '#ec4899',     // 粉色 - 平台
-      'authority': '#14b8a6',    // 青色 - 权威机构
-      'event': '#f59e0b',        // 琥珀色 - 事件
-      'concept': '#8b5cf6',      // 紫罗兰 - 概念
-      'location': '#22c55e',     // 绿色 - 地点
-      'conflict': '#dc2626',     // 深红色 - 冲突
-    };
-    return colorMap[node.group] || '#6366f1'; // 默认靛蓝色
+    return connected;
   }, []);
 
-  // 获取节点填充颜色 - 选中节点红色，相连节点彩色，其他灰色
-  const getNodeColor = useCallback((node: SimulationNode) => {
-    if (!selectedNode) {
-      return getBaseNodeColor(node);
-    }
-    const connected = connectedNodesRef.current;
-    if (node.id === selectedNode) {
-      return '#ef4444'; // 选中节点 - 红色
-    }
-    if (connected.has(node.id)) {
-      return getBaseNodeColor(node); // 相连节点 - 分类颜色
-    }
-    return '#9ca3af'; // 其他节点 - 灰色
-  }, [selectedNode, getBaseNodeColor]);
+  const applyStyles = useCallback((selected: string | null) => {
+    const linkSel = linkSelectionRef.current;
+    const nodeSel = nodeSelectionRef.current;
+    if (!linkSel || !nodeSel) return;
 
-  // 获取节点边框颜色
-  const getNodeStroke = useCallback((node: SimulationNode) => {
-    if (selectedNode && node.id === selectedNode) {
-      return '#b91c1c'; // 选中节点边框为深红色
-    }
-    return '#fff'; // 默认白色边框
-  }, [selectedNode]);
+    const connected = computeConnectedNodes(selected, simulationLinksRef.current);
 
-  // 获取节点边框宽度
-  const getNodeStrokeWidth = useCallback((node: SimulationNode) => {
-    if (selectedNode && node.id === selectedNode) {
-      return 3; // 选中节点边框加粗
-    }
-    return 2; // 默认边框宽度
-  }, [selectedNode]);
+    linkSel
+      .attr('stroke', (link: SimulationLink) => {
+        if (!selected) return '#cbd5e1';
+        const sourceId = typeof link.source === 'string' ? link.source : link.source.id;
+        const targetId = typeof link.target === 'string' ? link.target : link.target.id;
+        return (sourceId === selected || targetId === selected) ? '#ef4444' : '#e5e7eb';
+      })
+      .attr('stroke-opacity', (link: SimulationLink) => {
+        if (!selected) return 0.6;
+        const sourceId = typeof link.source === 'string' ? link.source : link.source.id;
+        const targetId = typeof link.target === 'string' ? link.target : link.target.id;
+        return (sourceId === selected || targetId === selected) ? 1 : 0.2;
+      });
 
-  const getLinkColor = useCallback((link: SimulationLink) => {
-    if (!selectedNode) return '#cbd5e1';
+    nodeSel.select('circle')
+      .attr('fill', (d: SimulationNode) => {
+        if (!selected) return getBaseNodeColor(d);
+        if (d.id === selected) return '#ef4444';
+        if (connected.has(d.id)) return getBaseNodeColor(d);
+        return '#9ca3af';
+      })
+      .attr('stroke', (d: SimulationNode) => {
+        return (selected && d.id === selected) ? '#b91c1c' : '#fff';
+      })
+      .attr('stroke-width', (d: SimulationNode) => {
+        return (selected && d.id === selected) ? 3 : 2;
+      });
 
-    const sourceId = typeof link.source === 'string' ? link.source : link.source.id;
-    const targetId = typeof link.target === 'string' ? link.target : link.target.id;
+    nodeSel.select('text')
+      .attr('fill', (d: SimulationNode) => {
+        if (!selected) return '#374151';
+        return d.id === selected ? '#1f2937' : '#6b7280';
+      })
+      .attr('font-weight', (d: SimulationNode) => {
+        return (selected && d.id === selected) ? '600' : 'normal';
+      });
+  }, [computeConnectedNodes]);
 
-    if (sourceId === selectedNode || targetId === selectedNode) {
-      return '#ef4444';
-    }
-    return '#e5e7eb';
-  }, [selectedNode]);
+  // selectedNode 变化时只更新样式，不重建模拟
+  useEffect(() => {
+    applyStyles(selectedNode);
+  }, [selectedNode, applyStyles]);
 
-  const getLinkOpacity = useCallback((link: SimulationLink) => {
-    if (!selectedNode) return 0.6;
-
-    const sourceId = typeof link.source === 'string' ? link.source : link.source.id;
-    const targetId = typeof link.target === 'string' ? link.target : link.target.id;
-
-    if (sourceId === selectedNode || targetId === selectedNode) {
-      return 1;
-    }
-    return 0.2;
-  }, [selectedNode]);
-
+  // 力模拟初始化：仅在 nodes/links/尺寸 变化时重建
   useEffect(() => {
     if (!svgRef.current || nodes.length === 0) return;
 
-    // 更新相连节点集合
-    updateConnectedNodes();
-
     const svg = d3.select(svgRef.current);
     svg.selectAll('*').remove();
+
+    const g = svg.append('g');
 
     const zoom = d3.zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.1, 4])
       .on('zoom', (event) => {
         g.attr('transform', event.transform);
       });
-
     svg.call(zoom);
-
-    const g = svg.append('g');
 
     const simulationNodes: SimulationNode[] = nodes.map(n => ({
       id: n.id,
@@ -162,6 +155,7 @@ export const ForceGraph: React.FC<ForceGraphProps> = ({
       source: l.source,
       target: l.target,
     }));
+    simulationLinksRef.current = simulationLinks;
 
     const simulation = d3.forceSimulation<SimulationNode>(simulationNodes)
       .force('link', d3.forceLink<SimulationNode, SimulationLink>(simulationLinks)
@@ -172,17 +166,18 @@ export const ForceGraph: React.FC<ForceGraphProps> = ({
       .force('center', d3.forceCenter(width / 2, height / 2))
       .force('collision', d3.forceCollide().radius(30));
 
-    const link = g.append('g')
+    const linkSel = g.append('g')
       .attr('stroke-linecap', 'round')
-      .selectAll('path')
+      .selectAll<SVGPathElement, SimulationLink>('path')
       .data(simulationLinks)
       .join('path')
       .attr('fill', 'none')
-      .attr('stroke', getLinkColor)
-      .attr('stroke-opacity', getLinkOpacity)
+      .attr('stroke', '#cbd5e1')
+      .attr('stroke-opacity', 0.6)
       .attr('stroke-width', 1.5);
+    linkSelectionRef.current = linkSel as unknown as d3.Selection<SVGPathElement, SimulationLink, SVGGElement, unknown>;
 
-    const node = g.append('g')
+    const nodeSel = g.append('g')
       .selectAll<SVGGElement, SimulationNode>('g')
       .data(simulationNodes)
       .join('g')
@@ -203,27 +198,28 @@ export const ForceGraph: React.FC<ForceGraphProps> = ({
           d.fy = null;
         })
       );
+    nodeSelectionRef.current = nodeSel as unknown as d3.Selection<SVGGElement, SimulationNode, SVGGElement, unknown>;
 
-    node.append('circle')
+    nodeSel.append('circle')
       .attr('r', 8)
-      .attr('fill', getNodeColor)
-      .attr('stroke', getNodeStroke)
-      .attr('stroke-width', getNodeStrokeWidth)
+      .attr('fill', d => getBaseNodeColor(d))
+      .attr('stroke', '#fff')
+      .attr('stroke-width', 2)
       .on('click', (event, d) => {
         event.stopPropagation();
-        onNodeClick(d.id);
+        onNodeClickRef.current(d.id);
       });
 
-    node.append('text')
+    nodeSel.append('text')
       .text(d => d.name.length > 20 ? d.name.slice(0, 20) + '...' : d.name)
       .attr('x', 12)
       .attr('y', 4)
       .attr('font-size', '10px')
-      .attr('fill', selectedNode ? '#9ca3af' : '#374151')
+      .attr('fill', '#374151')
       .style('pointer-events', 'none');
 
     simulation.on('tick', () => {
-      link
+      linkSel
         .attr('d', (d) => {
           const source = d.source as SimulationNode;
           const target = d.target as SimulationNode;
@@ -231,30 +227,24 @@ export const ForceGraph: React.FC<ForceGraphProps> = ({
           const dy = target.y! - source.y!;
           const dr = Math.sqrt(dx * dx + dy * dy);
           return `M${source.x},${source.y}A${dr},${dr} 0 0,1 ${target.x},${target.y}`;
-        })
-        .attr('stroke', getLinkColor)
-        .attr('stroke-opacity', getLinkOpacity);
+        });
 
-      node.attr('transform', d => `translate(${d.x},${d.y})`);
-
-      node.select('circle')
-        .attr('fill', getNodeColor)
-        .attr('stroke', getNodeStroke)
-        .attr('stroke-width', getNodeStrokeWidth);
-
-      node.select('text')
-        .attr('fill', selectedNode ? (d => (d as SimulationNode).id === selectedNode ? '#1f2937' : '#6b7280') : '#374151')
-        .attr('font-weight', selectedNode ? (d => (d as SimulationNode).id === selectedNode ? '600' : 'normal') : 'normal');
+      nodeSel.attr('transform', d => `translate(${d.x},${d.y})`);
     });
 
     svg.on('click', () => {
-      onNodeClick('');
+      onNodeClickRef.current('');
     });
+
+    // 初始化时如果已有选中节点，应用样式
+    applyStyles(selectedNodeRef.current);
 
     return () => {
       simulation.stop();
+      linkSelectionRef.current = null;
+      nodeSelectionRef.current = null;
     };
-  }, [nodes, links, selectedNode, onNodeClick, width, height, updateConnectedNodes, getNodeColor, getNodeStroke, getNodeStrokeWidth, getLinkColor, getLinkOpacity]);
+  }, [nodes, links, width, height, applyStyles]);
 
   return (
     <div ref={containerRef} className="w-full h-full">
