@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Upload, Terminal, Play } from 'lucide-react';
+import { sampleText } from '../data/sampleData';
 
 interface WelcomeScreenProps {
   onParse: (text: string) => void;
@@ -43,15 +44,6 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onParse }) => {
       onParse(text);
     }
   }, [text, onParse]);
-
-  const sampleText = `+--- androidx.core:core-ktx:1.9.0
-|    +--- androidx.annotation:annotation:1.3.0
-|    |    \\--- org.jetbrains.kotlin:kotlin-stdlib:1.7.10
-|    \\--- androidx.core:core:1.9.0
-+--- com.google.android.material:material:1.8.0
-|    +--- androidx.core:core:1.6.0 -> 1.9.0
-|    \\--- androidx.annotation:annotation:1.2.0 -> 1.3.0
-\\--- org.jetbrains.kotlin:kotlin-stdlib:1.8.0`;
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-8 bg-transparent">
