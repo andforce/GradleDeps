@@ -38,16 +38,30 @@ jobs:
           script: |
             set -e
 
-            # 安装 nginx（幂等）
-            if ! command -v nginx &> /dev/null; then
-              apt-get update -qq
-              apt-get install -y nginx
-            fi
+            # 等待其他 apt 进程释放锁（最多等 3 分钟）
+            wait_apt_lock() {
+              local i=0
+              while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
+                if [ $i -ge 36 ]; then
+                  echo "ERROR: apt lock not released after 3 minutes"
+                  exit 1
+                fi
+                echo "Waiting for apt lock... ($((i * 5))s)"
+                sleep 5
+                i=$((i + 1))
+              done
+            }
 
-            # 安装 certbot（幂等）
-            if ! command -v certbot &> /dev/null; then
+            # 按需安装缺失工具（一次 update，减少耗时）
+            PKGS_TO_INSTALL=""
+            command -v nginx   &>/dev/null || PKGS_TO_INSTALL="$PKGS_TO_INSTALL nginx"
+            command -v certbot &>/dev/null || PKGS_TO_INSTALL="$PKGS_TO_INSTALL certbot python3-certbot-nginx"
+
+            if [ -n "$PKGS_TO_INSTALL" ]; then
+              wait_apt_lock
               apt-get update -qq
-              apt-get install -y certbot python3-certbot-nginx
+              wait_apt_lock
+              apt-get install -y $PKGS_TO_INSTALL
             fi
 
             systemctl enable nginx
