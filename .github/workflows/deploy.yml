@@ -5,6 +5,10 @@ on:
     branches: [main]
   workflow_dispatch:
 
+env:
+  DOMAIN: deps.aimfor.top
+  WEB_ROOT: /var/www/deps.aimfor.top
+
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
@@ -32,14 +36,65 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
           script: |
-            # 安装 nginx（幂等，已安装则跳过）
+            set -e
+
+            # 安装 nginx（幂等）
             if ! command -v nginx &> /dev/null; then
               apt-get update -qq
               apt-get install -y nginx
             fi
+
+            # 安装 certbot（幂等）
+            if ! command -v certbot &> /dev/null; then
+              apt-get update -qq
+              apt-get install -y certbot python3-certbot-nginx
+            fi
+
             systemctl enable nginx
             systemctl start nginx
-            mkdir -p /var/www/html
+            mkdir -p ${{ env.WEB_ROOT }}
+
+            # 写入 nginx 配置（覆盖式，保证配置与代码同步）
+            cat > /etc/nginx/sites-available/${{ env.DOMAIN }} << 'NGINX_CONF'
+            server {
+                listen 80;
+                listen [::]:80;
+                server_name ${{ env.DOMAIN }};
+
+                root ${{ env.WEB_ROOT }};
+                index index.html;
+
+                location / {
+                    try_files $uri $uri/ /index.html;
+                }
+
+                location /assets/ {
+                    expires 1y;
+                    add_header Cache-Control "public, immutable";
+                }
+            }
+            NGINX_CONF
+
+            # 启用站点配置（幂等）
+            ln -sf /etc/nginx/sites-available/${{ env.DOMAIN }} \
+                   /etc/nginx/sites-enabled/${{ env.DOMAIN }}
+
+            nginx -t
+            systemctl reload nginx
+
+            # 申请 Let's Encrypt 证书（已有证书则跳过）
+            if [ ! -d "/etc/letsencrypt/live/${{ env.DOMAIN }}" ]; then
+              certbot --nginx \
+                -d ${{ env.DOMAIN }} \
+                --non-interactive \
+                --agree-tos \
+                --email ${{ secrets.CERTBOT_EMAIL }} \
+                --redirect
+            fi
+
+            # 确保 certbot 自动续期 timer 已启用
+            systemctl enable certbot.timer
+            systemctl start certbot.timer
 
       - name: 上传构建产物
         uses: appleboy/scp-action@v0.1.7
@@ -48,6 +103,15 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
           source: 'dist/*'
-          target: '/var/www/html'
+          target: ${{ env.WEB_ROOT }}
           strip_components: 1
           rm: true
+
+      - name: 重载 nginx
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          script: |
+            nginx -t && systemctl reload nginx
