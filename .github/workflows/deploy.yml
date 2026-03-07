@@ -148,15 +148,26 @@ jobs:
 
             # 按需安装缺失工具（一次 update，减少耗时）
             PKGS_TO_INSTALL=""
-            command -v nginx   &>/dev/null || PKGS_TO_INSTALL="$PKGS_TO_INSTALL nginx"
-            command -v certbot &>/dev/null || PKGS_TO_INSTALL="$PKGS_TO_INSTALL certbot"
-            dpkg -s python3-certbot-nginx >/dev/null 2>&1 || PKGS_TO_INSTALL="$PKGS_TO_INSTALL python3-certbot-nginx"
+            command -v nginx &>/dev/null || PKGS_TO_INSTALL="$PKGS_TO_INSTALL nginx"
 
             if [ -n "$PKGS_TO_INSTALL" ]; then
               wait_apt_lock
               apt-get update -qq
               wait_apt_lock
               apt-get install -y $PKGS_TO_INSTALL
+            fi
+
+            # certbot 通过 snap 安装，避免 apt 版本与 pip urllib3 的依赖冲突
+            if ! certbot --version &>/dev/null; then
+              apt-get remove -y certbot python3-certbot-nginx 2>/dev/null || true
+              snap install --classic certbot 2>/dev/null || {
+                wait_apt_lock
+                apt-get update -qq
+                wait_apt_lock
+                apt-get install -y snapd
+                snap install --classic certbot
+              }
+              ln -sf /snap/bin/certbot /usr/bin/certbot
             fi
 
             start_nginx() {
@@ -212,9 +223,11 @@ jobs:
               start_nginx
             fi
 
-            # 确保 certbot 自动续期 timer 已启用
-            systemctl enable certbot.timer
-            systemctl start certbot.timer
+            # 确保 certbot 自动续期已启用（snap 版自带续期，apt 版用 systemd timer）
+            if systemctl list-unit-files certbot.timer &>/dev/null; then
+              systemctl enable certbot.timer
+              systemctl start certbot.timer
+            fi
 
       - name: 上传构建产物
         uses: appleboy/scp-action@v0.1.7
