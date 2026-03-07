@@ -223,11 +223,9 @@ jobs:
               start_nginx
             fi
 
-            # 确保 certbot 自动续期已启用（snap 版自带续期，apt 版用 systemd timer）
-            if systemctl list-unit-files certbot.timer &>/dev/null; then
-              systemctl enable certbot.timer
-              systemctl start certbot.timer
-            fi
+            # snap 版 certbot 自带续期定时任务，无需额外配置
+            # apt 版残留的 certbot.timer 可能处于 masked 状态，清理它
+            systemctl unmask certbot.timer 2>/dev/null || true
 
       - name: 上传构建产物
         uses: appleboy/scp-action@v0.1.7
