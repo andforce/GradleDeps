@@ -205,7 +205,13 @@ export const ForceGraph: React.FC<ForceGraphProps> = ({
 
       nodeSel.each(function(d) {
       const el = d3.select(this);
-      const setupShape = (shape: d3.Selection<SVGGElement | SVGRectElement | SVGCircleElement, unknown, null, undefined>) => {
+      const setupShape = <
+        T extends SVGPathElement | SVGCircleElement,
+        PElement extends d3.BaseType,
+        PDatum
+      >(
+        shape: d3.Selection<T, unknown, PElement, PDatum>
+      ) => {
         shape
           .attr('fill', getBaseNodeColor(d))
           .attr('stroke', '#fff')
