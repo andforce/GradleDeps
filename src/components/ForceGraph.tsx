@@ -91,13 +91,13 @@ export const ForceGraph: React.FC<ForceGraphProps> = ({
         if (!selected) return '#cbd5e1';
         const sourceId = typeof link.source === 'string' ? link.source : link.source.id;
         const targetId = typeof link.target === 'string' ? link.target : link.target.id;
-        return (sourceId === selected || targetId === selected) ? '#ef4444' : '#e5e7eb';
+        return (sourceId === selected || targetId === selected) ? '#ef4444' : '#cbd5e1';
       })
       .attr('stroke-opacity', (link: SimulationLink) => {
         if (!selected) return 0.6;
         const sourceId = typeof link.source === 'string' ? link.source : link.source.id;
         const targetId = typeof link.target === 'string' ? link.target : link.target.id;
-        return (sourceId === selected || targetId === selected) ? 1 : 0.2;
+        return (sourceId === selected || targetId === selected) ? 1 : 0.6;
       });
 
     nodeSel.select('.node-shape')
