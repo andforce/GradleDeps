@@ -34,7 +34,10 @@ export const GraphVisualization: React.FC<GraphVisualizationProps> = ({ data, on
     if (!graphRef.current) return;
 
     try {
-      const dataUrl = await toPng(graphRef.current, { quality: 0.95 });
+      const dataUrl = await toPng(graphRef.current, {
+        quality: 0.95,
+        filter: (node) => !(node instanceof HTMLElement && node.dataset.exportIgnore !== undefined),
+      });
       const link = document.createElement('a');
       link.download = 'gradle-dependencies.png';
       link.href = dataUrl;
@@ -87,13 +90,13 @@ export const GraphVisualization: React.FC<GraphVisualizationProps> = ({ data, on
             height={dimensions.height}
           />
 
-          <div className="absolute bottom-4 left-4 z-10 pointer-events-none">
+          <div className="absolute bottom-4 left-4 z-10 pointer-events-none" data-export-ignore>
             <div className="pointer-events-auto">
               <Legend />
             </div>
           </div>
 
-          <div className="absolute top-4 left-4 w-72 z-10 pointer-events-none">
+          <div className="absolute top-4 left-4 w-72 z-10 pointer-events-none" data-export-ignore>
             <div className="pointer-events-auto">
               <ConflictPanel
                 conflicts={data.conflicts}
