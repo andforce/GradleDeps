@@ -52,10 +52,105 @@ jobs:
               done
             }
 
+            write_bootstrap_nginx_conf() {
+              cat > /etc/nginx/sites-available/${{ env.DOMAIN }} << 'NGINX_CONF'
+            server {
+                listen 80;
+                listen [::]:80;
+                server_name ${{ env.DOMAIN }};
+
+                root ${{ env.WEB_ROOT }};
+                index index.html;
+
+                location /.well-known/acme-challenge/ {
+                    try_files $uri =404;
+                }
+
+                location / {
+                    try_files $uri $uri/ /index.html;
+                }
+
+                location /assets/ {
+                    expires 1y;
+                    add_header Cache-Control "public, immutable";
+                }
+            }
+            NGINX_CONF
+            }
+
+            write_https_nginx_conf() {
+              cat > /etc/nginx/sites-available/${{ env.DOMAIN }} << 'NGINX_CONF'
+            server {
+                listen 80;
+                listen [::]:80;
+                server_name ${{ env.DOMAIN }};
+
+                location /.well-known/acme-challenge/ {
+                    root ${{ env.WEB_ROOT }};
+                    try_files $uri =404;
+                }
+
+                location / {
+                    return 301 https://$host$request_uri;
+                }
+            }
+
+            server {
+                listen 443 ssl http2;
+                listen [::]:443 ssl http2;
+                server_name ${{ env.DOMAIN }};
+
+                root ${{ env.WEB_ROOT }};
+                index index.html;
+
+                ssl_certificate /etc/letsencrypt/live/${{ env.DOMAIN }}/fullchain.pem;
+                ssl_certificate_key /etc/letsencrypt/live/${{ env.DOMAIN }}/privkey.pem;
+                ssl_session_timeout 1d;
+                ssl_session_cache shared:SSL:10m;
+                ssl_session_tickets off;
+                ssl_protocols TLSv1.2 TLSv1.3;
+
+                add_header Strict-Transport-Security "max-age=31536000" always;
+
+                location / {
+                    try_files $uri $uri/ /index.html;
+                }
+
+                location /assets/ {
+                    expires 1y;
+                    add_header Cache-Control "public, immutable";
+                }
+            }
+            NGINX_CONF
+            }
+
+            ensure_ports_are_compatible() {
+              local listeners
+              listeners="$(ss -ltnp '( sport = :80 or sport = :443 )' 2>/dev/null || true)"
+
+              if [ -z "$listeners" ]; then
+                return 0
+              fi
+
+              if echo "$listeners" | grep -Eq 'users:\(\("nginx"'; then
+                if echo "$listeners" | grep -Ev 'State|Recv-Q|Send-Q|nginx' | grep -q .; then
+                  echo "ERROR: ports 80/443 are already used by a non-nginx process"
+                  echo "$listeners"
+                  exit 1
+                fi
+                return 0
+              fi
+
+              echo "ERROR: shared 80/443 deployment requires nginx to own these ports"
+              echo "$listeners"
+              exit 1
+            }
+
             # 按需安装缺失工具（一次 update，减少耗时）
             PKGS_TO_INSTALL=""
             command -v nginx   &>/dev/null || PKGS_TO_INSTALL="$PKGS_TO_INSTALL nginx"
-            command -v certbot &>/dev/null || PKGS_TO_INSTALL="$PKGS_TO_INSTALL certbot python3-certbot-nginx"
+            command -v certbot &>/dev/null || PKGS_TO_INSTALL="$PKGS_TO_INSTALL certbot"
+            dpkg -s python3-certbot-nginx >/dev/null 2>&1 || PKGS_TO_INSTALL="$PKGS_TO_INSTALL python3-certbot-nginx"
 
             if [ -n "$PKGS_TO_INSTALL" ]; then
               wait_apt_lock
@@ -64,46 +159,38 @@ jobs:
               apt-get install -y $PKGS_TO_INSTALL
             fi
 
+            ensure_ports_are_compatible
             systemctl enable nginx
             systemctl start nginx
             mkdir -p ${{ env.WEB_ROOT }}
-
-            # 写入 nginx 配置（覆盖式，保证配置与代码同步）
-            cat > /etc/nginx/sites-available/${{ env.DOMAIN }} << 'NGINX_CONF'
-server {
-    listen 80;
-    listen [::]:80;
-    server_name ${{ env.DOMAIN }};
-
-    root ${{ env.WEB_ROOT }};
-    index index.html;
-
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
-
-    location /assets/ {
-        expires 1y;
-        add_header Cache-Control "public, immutable";
-    }
-}
-NGINX_CONF
+            mkdir -p ${{ env.WEB_ROOT }}/.well-known/acme-challenge
 
             # 启用站点配置（幂等）
             ln -sf /etc/nginx/sites-available/${{ env.DOMAIN }} \
                    /etc/nginx/sites-enabled/${{ env.DOMAIN }}
 
-            nginx -t
-            systemctl reload nginx
+            # 首次签发前只能写入 80 端口引导配置；已有证书则直接写正式 HTTPS 配置
+            if [ -f "/etc/letsencrypt/live/${{ env.DOMAIN }}/fullchain.pem" ] && \
+               [ -f "/etc/letsencrypt/live/${{ env.DOMAIN }}/privkey.pem" ]; then
+              write_https_nginx_conf
+              nginx -t
+              systemctl reload nginx
+            else
+              write_bootstrap_nginx_conf
+              nginx -t
+              systemctl reload nginx
 
-            # 申请 Let's Encrypt 证书（已有证书则跳过）
-            if [ ! -d "/etc/letsencrypt/live/${{ env.DOMAIN }}" ]; then
-              certbot --nginx \
+              certbot certonly \
+                --webroot \
+                -w ${{ env.WEB_ROOT }} \
                 -d ${{ env.DOMAIN }} \
                 --non-interactive \
                 --agree-tos \
-                --email ${{ secrets.CERTBOT_EMAIL }} \
-                --redirect
+                --email ${{ secrets.CERTBOT_EMAIL }}
+
+              write_https_nginx_conf
+              nginx -t
+              systemctl reload nginx
             fi
 
             # 确保 certbot 自动续期 timer 已启用
