@@ -40,7 +40,6 @@ interface SimulationLink extends d3.SimulationLinkDatum<SimulationNode> {
 const LINK_COLOR_DEFAULT = '#cbd5e1';
 const LINK_COLOR_OUTGOING = '#3b82f6';
 const LINK_COLOR_INCOMING = '#f97316';
-const LINK_COLOR_DIMMED = '#cbd5e1';
 
 const getBaseNodeColor = (node: SimulationNode): string => {
   if (node.hasConflict) return '#ef4444';
@@ -57,7 +56,7 @@ const getLinkColor = (link: SimulationLink, selected: string | null): string => 
   const targetId = typeof link.target === 'string' ? link.target : link.target.id;
   if (sourceId === selected) return LINK_COLOR_OUTGOING;
   if (targetId === selected) return LINK_COLOR_INCOMING;
-  return LINK_COLOR_DIMMED;
+  return LINK_COLOR_DEFAULT;
 };
 
 const getMarkerIdForLink = (link: SimulationLink, selected: string | null): string => {
@@ -115,7 +114,7 @@ export const ForceGraph: React.FC<ForceGraphProps> = ({
         if (!selected) return 0.6;
         const sourceId = typeof link.source === 'string' ? link.source : link.source.id;
         const targetId = typeof link.target === 'string' ? link.target : link.target.id;
-        return (sourceId === selected || targetId === selected) ? 1 : 0.15;
+        return (sourceId === selected || targetId === selected) ? 1 : 0.6;
       })
       .attr('marker-end', (link: SimulationLink) => getMarkerIdForLink(link, selected));
 
