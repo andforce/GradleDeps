@@ -37,6 +37,11 @@ interface SimulationLink extends d3.SimulationLinkDatum<SimulationNode> {
   target: string | SimulationNode;
 }
 
+const LINK_COLOR_DEFAULT = '#cbd5e1';
+const LINK_COLOR_OUTGOING = '#3b82f6';
+const LINK_COLOR_INCOMING = '#f97316';
+const LINK_COLOR_DIMMED = '#cbd5e1';
+
 const getBaseNodeColor = (node: SimulationNode): string => {
   if (node.hasConflict) return '#ef4444';
   if (node.type === 'project') return '#ec4899';
@@ -44,6 +49,24 @@ const getBaseNodeColor = (node: SimulationNode): string => {
   if (node.group.startsWith('org.jetbrains')) return '#3b82f6';
   if (node.group.startsWith('com.google')) return '#f59e0b';
   return '#6366f1';
+};
+
+const getLinkColor = (link: SimulationLink, selected: string | null): string => {
+  if (!selected) return LINK_COLOR_DEFAULT;
+  const sourceId = typeof link.source === 'string' ? link.source : link.source.id;
+  const targetId = typeof link.target === 'string' ? link.target : link.target.id;
+  if (sourceId === selected) return LINK_COLOR_OUTGOING;
+  if (targetId === selected) return LINK_COLOR_INCOMING;
+  return LINK_COLOR_DIMMED;
+};
+
+const getMarkerIdForLink = (link: SimulationLink, selected: string | null): string => {
+  if (!selected) return 'url(#arrow-default)';
+  const sourceId = typeof link.source === 'string' ? link.source : link.source.id;
+  const targetId = typeof link.target === 'string' ? link.target : link.target.id;
+  if (sourceId === selected) return 'url(#arrow-outgoing)';
+  if (targetId === selected) return 'url(#arrow-incoming)';
+  return 'url(#arrow-default)';
 };
 
 export const ForceGraph: React.FC<ForceGraphProps> = ({
@@ -87,18 +110,14 @@ export const ForceGraph: React.FC<ForceGraphProps> = ({
     const connected = computeConnectedNodes(selected, simulationLinksRef.current);
 
     linkSel
-      .attr('stroke', (link: SimulationLink) => {
-        if (!selected) return '#cbd5e1';
-        const sourceId = typeof link.source === 'string' ? link.source : link.source.id;
-        const targetId = typeof link.target === 'string' ? link.target : link.target.id;
-        return (sourceId === selected || targetId === selected) ? '#ef4444' : '#cbd5e1';
-      })
+      .attr('stroke', (link: SimulationLink) => getLinkColor(link, selected))
       .attr('stroke-opacity', (link: SimulationLink) => {
         if (!selected) return 0.6;
         const sourceId = typeof link.source === 'string' ? link.source : link.source.id;
         const targetId = typeof link.target === 'string' ? link.target : link.target.id;
-        return (sourceId === selected || targetId === selected) ? 1 : 0.6;
-      });
+        return (sourceId === selected || targetId === selected) ? 1 : 0.15;
+      })
+      .attr('marker-end', (link: SimulationLink) => getMarkerIdForLink(link, selected));
 
     nodeSel.select('.node-shape')
       .attr('fill', (d: SimulationNode) => {
@@ -135,6 +154,26 @@ export const ForceGraph: React.FC<ForceGraphProps> = ({
 
     const svg = d3.select(svgRef.current);
     svg.selectAll('*').remove();
+
+    const defs = svg.append('defs');
+    const markerConfigs = [
+      { id: 'arrow-default', color: LINK_COLOR_DEFAULT },
+      { id: 'arrow-outgoing', color: LINK_COLOR_OUTGOING },
+      { id: 'arrow-incoming', color: LINK_COLOR_INCOMING },
+    ];
+    for (const mc of markerConfigs) {
+      defs.append('marker')
+        .attr('id', mc.id)
+        .attr('viewBox', '0 -5 10 10')
+        .attr('refX', 18)
+        .attr('refY', 0)
+        .attr('markerWidth', 6)
+        .attr('markerHeight', 6)
+        .attr('orient', 'auto')
+        .append('path')
+        .attr('d', 'M0,-5L10,0L0,5')
+        .attr('fill', mc.color);
+    }
 
     const g = svg.append('g');
 
@@ -175,9 +214,10 @@ export const ForceGraph: React.FC<ForceGraphProps> = ({
       .data(simulationLinks)
       .join('path')
       .attr('fill', 'none')
-      .attr('stroke', '#cbd5e1')
+      .attr('stroke', LINK_COLOR_DEFAULT)
       .attr('stroke-opacity', 0.6)
-      .attr('stroke-width', 1.5);
+      .attr('stroke-width', 1.5)
+      .attr('marker-end', 'url(#arrow-default)');
     linkSelectionRef.current = linkSel as unknown as d3.Selection<SVGPathElement, SimulationLink, SVGGElement, unknown>;
 
     const nodeSel = g.append('g')

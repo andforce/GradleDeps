@@ -7,13 +7,23 @@ interface LegendItem {
   shape?: 'circle' | 'star';
 }
 
-const items: LegendItem[] = [
+interface EdgeLegendItem {
+  color: string;
+  label: string;
+  type: 'edge';
+}
+
+type AnyLegendItem = LegendItem | EdgeLegendItem;
+
+const items: AnyLegendItem[] = [
   { color: '#ef4444', label: 'Conflict' },
   { color: '#10b981', label: 'AndroidX' },
   { color: '#3b82f6', label: 'Kotlin/JetBrains' },
   { color: '#f59e0b', label: 'Google' },
   { color: '#6366f1', label: 'Other' },
   { color: '#ec4899', label: 'Project', shape: 'star' },
+  { color: '#3b82f6', label: 'Depends on (out)', type: 'edge' },
+  { color: '#f97316', label: 'Depended by (in)', type: 'edge' },
 ];
 
 const StarIcon: React.FC<{ color: string }> = ({ color }) => (
@@ -43,7 +53,12 @@ export const Legend: React.FC = () => {
             transition={{ delay: index * 0.05 }}
             className="flex items-center"
           >
-            {item.shape === 'star' ? (
+            {'type' in item && item.type === 'edge' ? (
+              <svg width="18" height="14" viewBox="0 0 18 14" className="mr-2 flex-shrink-0">
+                <line x1="0" y1="7" x2="12" y2="7" stroke={item.color} strokeWidth="2" />
+                <polygon points="12,3 18,7 12,11" fill={item.color} />
+              </svg>
+            ) : 'shape' in item && item.shape === 'star' ? (
               <StarIcon color={item.color} />
             ) : (
               <span
