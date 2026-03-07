@@ -159,10 +159,32 @@ jobs:
               apt-get install -y $PKGS_TO_INSTALL
             fi
 
+            start_nginx() {
+              nginx -t
+              systemctl start nginx || {
+                echo "===== nginx 启动失败，诊断信息 ====="
+                systemctl status nginx.service --no-pager || true
+                journalctl -xeu nginx.service --no-pager -n 30 || true
+                echo "===== 端口占用情况 ====="
+                ss -ltnp '( sport = :80 or sport = :443 )' || true
+                exit 1
+              }
+            }
+
             ensure_ports_are_compatible
             systemctl enable nginx
+
+            # 停止 nginx 确保干净状态（apt 安装后会自动启动）
+            systemctl stop nginx 2>/dev/null || true
+            # 清理可能残留的 master 进程
+            pkill -9 nginx 2>/dev/null || true
+            rm -f /run/nginx.pid
+
             mkdir -p ${{ env.WEB_ROOT }}
             mkdir -p ${{ env.WEB_ROOT }}/.well-known/acme-challenge
+
+            # 移除默认站点避免端口冲突
+            rm -f /etc/nginx/sites-enabled/default
 
             # 启用站点配置（幂等）
             ln -sf /etc/nginx/sites-available/${{ env.DOMAIN }} \
@@ -172,12 +194,10 @@ jobs:
             if [ -f "/etc/letsencrypt/live/${{ env.DOMAIN }}/fullchain.pem" ] && \
                [ -f "/etc/letsencrypt/live/${{ env.DOMAIN }}/privkey.pem" ]; then
               write_https_nginx_conf
-              nginx -t
-              systemctl restart nginx
+              start_nginx
             else
               write_bootstrap_nginx_conf
-              nginx -t
-              systemctl restart nginx
+              start_nginx
 
               certbot certonly \
                 --webroot \
@@ -187,9 +207,9 @@ jobs:
                 --agree-tos \
                 --email ${{ secrets.CERTBOT_EMAIL }}
 
+              systemctl stop nginx
               write_https_nginx_conf
-              nginx -t
-              systemctl restart nginx
+              start_nginx
             fi
 
             # 确保 certbot 自动续期 timer 已启用
