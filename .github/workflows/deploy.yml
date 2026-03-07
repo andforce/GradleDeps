@@ -70,24 +70,24 @@ jobs:
 
             # 写入 nginx 配置（覆盖式，保证配置与代码同步）
             cat > /etc/nginx/sites-available/${{ env.DOMAIN }} << 'NGINX_CONF'
-            server {
-                listen 80;
-                listen [::]:80;
-                server_name ${{ env.DOMAIN }};
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${{ env.DOMAIN }};
 
-                root ${{ env.WEB_ROOT }};
-                index index.html;
+    root ${{ env.WEB_ROOT }};
+    index index.html;
 
-                location / {
-                    try_files $uri $uri/ /index.html;
-                }
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
 
-                location /assets/ {
-                    expires 1y;
-                    add_header Cache-Control "public, immutable";
-                }
-            }
-            NGINX_CONF
+    location /assets/ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+}
+NGINX_CONF
 
             # 启用站点配置（幂等）
             ln -sf /etc/nginx/sites-available/${{ env.DOMAIN }} \
