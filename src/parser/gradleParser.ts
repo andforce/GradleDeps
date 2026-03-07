@@ -4,6 +4,7 @@ export function parseGradleDependencies(text: string): ParsedGraph {
   const lines = text.split('\n');
   const nodes = new Map<string, DependencyNode>();
   const links: DependencyLink[] = [];
+  const linkSet = new Set<string>();
   const conflictMap = new Map<string, Set<string>>();
 
   const stack: { id: string; level: number }[] = [];
@@ -12,7 +13,7 @@ export function parseGradleDependencies(text: string): ParsedGraph {
     const parsed = parseLine(line);
     if (!parsed) continue;
 
-    const { name, version, level } = parsed;
+    const { name, version, level, isConstraint } = parsed;
     const id = version ? `${name}:${version}` : name;
 
     if (version) {
@@ -44,7 +45,7 @@ export function parseGradleDependencies(text: string): ParsedGraph {
       stack.pop();
     }
 
-    if (stack.length > 0) {
+    if (!isConstraint && stack.length > 0) {
       const parentId = stack[stack.length - 1].id;
       const parent = nodes.get(parentId)!;
       const child = nodes.get(id)!;
@@ -56,10 +57,16 @@ export function parseGradleDependencies(text: string): ParsedGraph {
         child.parents.push(parentId);
       }
 
-      links.push({ source: parentId, target: id });
+      const linkKey = `${parentId}->${id}`;
+      if (!linkSet.has(linkKey)) {
+        linkSet.add(linkKey);
+        links.push({ source: parentId, target: id });
+      }
     }
 
-    stack.push({ id, level });
+    if (!isConstraint) {
+      stack.push({ id, level });
+    }
   }
 
   const conflicts: ConflictInfo[] = [];
@@ -94,7 +101,7 @@ export function parseGradleDependencies(text: string): ParsedGraph {
   };
 }
 
-function parseLine(line: string): { name: string; version: string; level: number; isTransitive: boolean } | null {
+function parseLine(line: string): { name: string; version: string; level: number; isTransitive: boolean; isConstraint: boolean } | null {
   // +--- androidx.core:core-ktx:1.9.0
   // |    +--- androidx.annotation:annotation:1.3.0
   // |    |    \--- org.jetbrains.kotlin:kotlin-stdlib:1.7.10
@@ -103,7 +110,9 @@ function parseLine(line: string): { name: string; version: string; level: number
   const match = line.match(/[+\\]---\s+(.*)$/);
   if (!match) return null;
 
-  const content = match[1].trim();
+  const rawContent = match[1].trim();
+  const isConstraint = /\(c\)$/.test(rawContent);
+  const content = rawContent.replace(/\s+\((?:\*|c)\)$/, '').trim();
   const level = line.search(/[+\\]---/);
 
   // group:name:version 或 group:name:version -> resolvedVersion
@@ -120,6 +129,7 @@ function parseLine(line: string): { name: string; version: string; level: number
       version: resolvedVersion,
       level: Math.floor(level / 5),
       isTransitive: line.includes('\\---'),
+      isConstraint,
     };
   }
 
@@ -131,6 +141,7 @@ function parseLine(line: string): { name: string; version: string; level: number
       version: '',
       level: Math.floor(level / 5),
       isTransitive: false,
+      isConstraint,
     };
   }
 
