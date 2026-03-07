@@ -161,7 +161,6 @@ jobs:
 
             ensure_ports_are_compatible
             systemctl enable nginx
-            systemctl start nginx
             mkdir -p ${{ env.WEB_ROOT }}
             mkdir -p ${{ env.WEB_ROOT }}/.well-known/acme-challenge
 
@@ -174,11 +173,11 @@ jobs:
                [ -f "/etc/letsencrypt/live/${{ env.DOMAIN }}/privkey.pem" ]; then
               write_https_nginx_conf
               nginx -t
-              systemctl reload nginx
+              systemctl restart nginx
             else
               write_bootstrap_nginx_conf
               nginx -t
-              systemctl reload nginx
+              systemctl restart nginx
 
               certbot certonly \
                 --webroot \
@@ -190,7 +189,7 @@ jobs:
 
               write_https_nginx_conf
               nginx -t
-              systemctl reload nginx
+              systemctl restart nginx
             fi
 
             # 确保 certbot 自动续期 timer 已启用
