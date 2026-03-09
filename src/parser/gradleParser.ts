@@ -117,7 +117,7 @@ function parseLine(line: string): { name: string; version: string; level: number
 
   // group:name:version 或 group:name:version -> resolvedVersion
   // 版本部分可能是 {strictly X.Y.Z} 等约束格式
-  const versionMatch = content.match(/^([^\s]+):([^\s]+):(\{[^}]+\}|[^\s->]+)(?:\s*->\s*(\S+))?/);
+  const versionMatch = content.match(/^([^\s]+):([^\s]+):(\{[^}]+\}|[^\s]+?)(?:\s+->\s+(\S+))?$/);
   if (versionMatch) {
     let resolvedVersion = versionMatch[4] || versionMatch[3];
     const constraintMatch = resolvedVersion.match(/\{\w+\s+([^}]+)\}/);
