@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Box, GitBranch, AlertCircle, AlertTriangle, Layers } from 'lucide-react';
 import type { DependencyNode } from '../types/dependency';
@@ -10,6 +10,12 @@ interface NodeDetailsProps {
 }
 
 export const NodeDetails: React.FC<NodeDetailsProps> = ({ node, allNodes, onClose }) => {
+  const [showAllParents, setShowAllParents] = useState(false);
+
+  useEffect(() => {
+    setShowAllParents(false);
+  }, [node?.id]);
+
   const stats = useMemo(() => {
     if (!node) return null;
 
@@ -128,19 +134,30 @@ export const NodeDetails: React.FC<NodeDetailsProps> = ({ node, allNodes, onClos
               <div className="pt-6 border-t border-slate-200/50">
                 <label className="flex items-center gap-1.5 text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-3">
                   <Layers className="w-3.5 h-3.5" />
-                  Referenced by ({stats.parentNames.length})
+                  Depended by ({stats.parentNames.length})
                 </label>
                 <div className="bg-white/50 rounded-xl border border-slate-200/50 overflow-hidden">
                   <ul className="divide-y divide-slate-100/50">
-                    {stats.parentNames.slice(0, 5).map((name, idx) => (
+                    {(showAllParents ? stats.parentNames : stats.parentNames.slice(0, 5)).map((name, idx) => (
                       <li key={idx} className="text-sm text-slate-600 truncate px-3 py-2 hover:bg-slate-50/80 transition-colors flex items-center gap-2">
                         <div className="w-1.5 h-1.5 rounded-full bg-slate-300" />
                         {name}
                       </li>
                     ))}
-                    {stats.parentNames.length > 5 && (
-                      <li className="text-xs text-slate-400 px-3 py-2 bg-slate-50/50 font-medium text-center">
+                    {stats.parentNames.length > 5 && !showAllParents && (
+                      <li
+                        className="text-xs text-blue-500 px-3 py-2 bg-slate-50/50 font-medium text-center cursor-pointer hover:bg-blue-50/80 transition-colors"
+                        onClick={() => setShowAllParents(true)}
+                      >
                         + {stats.parentNames.length - 5} more modules
+                      </li>
+                    )}
+                    {showAllParents && stats.parentNames.length > 5 && (
+                      <li
+                        className="text-xs text-blue-500 px-3 py-2 bg-slate-50/50 font-medium text-center cursor-pointer hover:bg-blue-50/80 transition-colors"
+                        onClick={() => setShowAllParents(false)}
+                      >
+                        Collapse
                       </li>
                     )}
                   </ul>
