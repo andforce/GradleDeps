@@ -1,7 +1,8 @@
 export interface DependencyNode {
   id: string;
   name: string;
-  version: string;
+  version: string;           // 实际版本号 (resolved version)
+  declaredVersion: string;   // 引用版本号 (declared version)
   group: string;
   type: 'external' | 'project';
   level: number;

@@ -94,9 +94,20 @@ export const NodeDetails: React.FC<NodeDetailsProps> = ({ node, allNodes, onClos
                 </p>
               </div>
 
+              {node.declaredVersion && node.declaredVersion !== node.version && (
+                <div className="group">
+                  <label className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1 block">Declared Version</label>
+                  <p className="text-amber-600 font-mono text-sm bg-amber-50/30 p-2.5 rounded-lg border border-amber-100/50">
+                    {node.declaredVersion}
+                  </p>
+                </div>
+              )}
+
               {node.version && (
                 <div className="group">
-                  <label className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1 block">Version</label>
+                  <label className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1 block">
+                    {node.declaredVersion && node.declaredVersion !== node.version ? 'Resolved Version' : 'Version'}
+                  </label>
                   <p className="text-blue-600 font-mono text-sm bg-blue-50/30 p-2.5 rounded-lg border border-blue-100/50">
                     {node.version}
                   </p>

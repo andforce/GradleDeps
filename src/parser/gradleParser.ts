@@ -9,11 +9,24 @@ export function parseGradleDependencies(text: string): ParsedGraph {
 
   const stack: { id: string; level: number }[] = [];
 
+  // Only process debugCompileClasspath and releaseCompileClasspath
+  const TARGET_CONFIGS = new Set(['debugCompileClasspath', 'releaseCompileClasspath']);
+  let inTargetConfig = false;
+
   for (const line of lines) {
+    // Detect configuration headers like "debugCompileClasspath - Compile classpath for /debug."
+    const configMatch = line.match(/^(\S+)\s+-\s+/);
+    if (configMatch) {
+      inTargetConfig = TARGET_CONFIGS.has(configMatch[1]);
+      stack.length = 0; // Reset stack when switching configurations
+      continue;
+    }
+
+    if (!inTargetConfig) continue;
     const parsed = parseLine(line);
     if (!parsed) continue;
 
-    const { name, version, level, isConstraint } = parsed;
+    const { name, version, declaredVersion, level, isConstraint } = parsed;
     const id = version ? `${name}:${version}` : name;
 
     if (version) {
@@ -32,6 +45,7 @@ export function parseGradleDependencies(text: string): ParsedGraph {
         id,
         name: artifactName,
         version: version || '',
+        declaredVersion: declaredVersion || '',
         group,
         type: name.startsWith('project ') ? 'project' : 'external',
         level,
@@ -101,7 +115,7 @@ export function parseGradleDependencies(text: string): ParsedGraph {
   };
 }
 
-function parseLine(line: string): { name: string; version: string; level: number; isTransitive: boolean; isConstraint: boolean } | null {
+function parseLine(line: string): { name: string; version: string; declaredVersion: string; level: number; isConstraint: boolean } | null {
   // +--- androidx.core:core-ktx:1.9.0
   // |    +--- androidx.annotation:annotation:1.3.0
   // |    |    \--- org.jetbrains.kotlin:kotlin-stdlib:1.7.10
@@ -118,18 +132,26 @@ function parseLine(line: string): { name: string; version: string; level: number
   // group:name:version 或 group:name:version -> resolvedVersion
   // 也支持 group:name -> resolvedVersion (无显式版本号)
   // 版本部分可能是 {strictly X.Y.Z} 等约束格式
-  const versionMatch = content.match(/^([^\s]+):([^\s]+)(?::(\{[^}]+\}|[^\s]+?))?(?:\s+->\s+(\S+))?$/);
+  const versionMatch = content.match(/^([^\s:]+):([^\s:]+)(?::(\{[^}]+\}|[^\s]+?))?(?:\s+->\s+(\S+))?$/);
   if (versionMatch) {
+    let declaredVersion = versionMatch[3] || '';
     let resolvedVersion = versionMatch[4] || versionMatch[3] || '';
+
+    // Clean up constraint syntax like {strictly 1.8.0}
+    const declaredConstraintMatch = declaredVersion.match(/\{\w+\s+([^}]+)\}/);
+    if (declaredConstraintMatch) {
+      declaredVersion = declaredConstraintMatch[1];
+    }
     const constraintMatch = resolvedVersion.match(/\{\w+\s+([^}]+)\}/);
     if (constraintMatch) {
       resolvedVersion = constraintMatch[1];
     }
+
     return {
       name: `${versionMatch[1]}:${versionMatch[2]}`,
       version: resolvedVersion,
+      declaredVersion,
       level: Math.floor(level / 5),
-      isTransitive: line.includes('\\---'),
       isConstraint,
     };
   }
@@ -141,8 +163,8 @@ function parseLine(line: string): { name: string; version: string; level: number
     return {
       name: `project ${projectName}`,
       version: '',
+      declaredVersion: '',
       level: Math.floor(level / 5),
-      isTransitive: false,
       isConstraint,
     };
   }
