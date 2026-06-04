@@ -5,7 +5,7 @@
 An Android-focused Gradle dependency visualization tool.  
 It parses the output of `./gradlew dependencies` into an interactive graph, helping you quickly inspect dependency layers, version conflicts, and key nodes.
 
-Live demo: <https://deps.aimfor.top>
+Live demo: <https://gradledeps.com>
 
 ## Features
 

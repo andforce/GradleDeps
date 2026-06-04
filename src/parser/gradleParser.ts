@@ -112,14 +112,15 @@ function parseLine(line: string): { name: string; version: string; level: number
 
   const rawContent = match[1].trim();
   const isConstraint = /\(c\)$/.test(rawContent);
-  const content = rawContent.replace(/\s+\((?:\*|c)\)$/, '').trim();
+  const content = rawContent.replace(/\s+\((?:n|\*|c)\)$/, '').trim();
   const level = line.search(/[+\\]---/);
 
   // group:name:version 或 group:name:version -> resolvedVersion
+  // 也支持 group:name -> resolvedVersion (无显式版本号)
   // 版本部分可能是 {strictly X.Y.Z} 等约束格式
-  const versionMatch = content.match(/^([^\s]+):([^\s]+):(\{[^}]+\}|[^\s]+?)(?:\s+->\s+(\S+))?$/);
+  const versionMatch = content.match(/^([^\s]+):([^\s]+)(?::(\{[^}]+\}|[^\s]+?))?(?:\s+->\s+(\S+))?$/);
   if (versionMatch) {
-    let resolvedVersion = versionMatch[4] || versionMatch[3];
+    let resolvedVersion = versionMatch[4] || versionMatch[3] || '';
     const constraintMatch = resolvedVersion.match(/\{\w+\s+([^}]+)\}/);
     if (constraintMatch) {
       resolvedVersion = constraintMatch[1];
@@ -133,11 +134,12 @@ function parseLine(line: string): { name: string; version: string; level: number
     };
   }
 
-  // project :app
-  const projectMatch = content.match(/^project\s+(:\S+)/);
+  // project :app 或 project ModuleName (无冒号)
+  const projectMatch = content.match(/^project\s+(:?\S+)/);
   if (projectMatch) {
+    const projectName = projectMatch[1].startsWith(':') ? projectMatch[1] : `:${projectMatch[1]}`;
     return {
-      name: `project ${projectMatch[1]}`,
+      name: `project ${projectName}`,
       version: '',
       level: Math.floor(level / 5),
       isTransitive: false,
