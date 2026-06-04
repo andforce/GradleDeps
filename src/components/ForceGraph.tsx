@@ -17,6 +17,7 @@ interface SimulationNode extends d3.SimulationNodeDatum {
   group: string;
   type: 'external' | 'project';
   hasConflict: boolean;
+  isAgpInternal: boolean;
   level: number;
 }
 
@@ -120,15 +121,22 @@ export const ForceGraph: React.FC<ForceGraphProps> = ({
 
     nodeSel.select('.node-shape')
       .attr('fill', (d: SimulationNode) => {
+        if (d.isAgpInternal) {
+          return (selected && d.id === selected) ? '#ef4444' : '#fff';
+        }
         if (!selected) return getBaseNodeColor(d);
         if (d.id === selected) return '#ef4444';
         if (connected.has(d.id)) return getBaseNodeColor(d);
         return '#9ca3af';
       })
       .attr('stroke', (d: SimulationNode) => {
+        if (d.isAgpInternal) {
+          return (selected && d.id === selected) ? '#b91c1c' : getBaseNodeColor(d);
+        }
         return (selected && d.id === selected) ? '#b91c1c' : '#fff';
       })
       .attr('stroke-width', (d: SimulationNode) => {
+        if (d.isAgpInternal) return 2.5;
         return (selected && d.id === selected) ? 3 : 2;
       });
 
@@ -189,6 +197,7 @@ export const ForceGraph: React.FC<ForceGraphProps> = ({
       group: n.group,
       type: n.type,
       hasConflict: n.hasConflict,
+      isAgpInternal: n.isAgpInternal,
       level: n.level,
     }));
 
@@ -249,12 +258,13 @@ export const ForceGraph: React.FC<ForceGraphProps> = ({
         PElement extends d3.BaseType,
         PDatum
       >(
-        shape: d3.Selection<T, unknown, PElement, PDatum>
+        shape: d3.Selection<T, unknown, PElement, PDatum>,
+        overrides?: Partial<{ fill: string; stroke: string; strokeWidth: number }>
       ) => {
         shape
-          .attr('fill', getBaseNodeColor(d))
-          .attr('stroke', '#fff')
-          .attr('stroke-width', 2)
+          .attr('fill', overrides?.fill ?? getBaseNodeColor(d))
+          .attr('stroke', overrides?.stroke ?? '#fff')
+          .attr('stroke-width', overrides?.strokeWidth ?? 2)
           .on('click', (event: MouseEvent) => {
             event.stopPropagation();
             onNodeClickRef.current(d.id);
@@ -263,6 +273,11 @@ export const ForceGraph: React.FC<ForceGraphProps> = ({
 
       if (d.type === 'project') {
         setupShape(el.append('path').attr('d', starPath(15, 6.75)).attr('class', 'node-shape'));
+      } else if (d.isAgpInternal) {
+        setupShape(
+          el.append('circle').attr('r', 8).attr('class', 'node-shape'),
+          { fill: '#fff', stroke: getBaseNodeColor(d), strokeWidth: 2.5 }
+        );
       } else {
         setupShape(el.append('circle').attr('r', 8).attr('class', 'node-shape'));
       }

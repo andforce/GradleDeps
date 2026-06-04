@@ -5,6 +5,7 @@ interface LegendItem {
   color: string;
   label: string;
   shape?: 'circle' | 'star';
+  hollow?: boolean;
 }
 
 interface EdgeLegendItem {
@@ -21,6 +22,7 @@ const items: AnyLegendItem[] = [
   { color: '#3b82f6', label: 'Kotlin/JetBrains' },
   { color: '#f59e0b', label: 'Google' },
   { color: '#6366f1', label: 'Other' },
+  { color: '#94a3b8', label: 'AGP Internal', hollow: true },
   { color: '#ec4899', label: 'Project', shape: 'star' },
   { color: '#3b82f6', label: 'Depends on (out)', type: 'edge' },
   { color: '#f97316', label: 'Depended by (in)', type: 'edge' },
@@ -60,6 +62,11 @@ export const Legend: React.FC = () => {
               </svg>
             ) : 'shape' in item && item.shape === 'star' ? (
               <StarIcon color={item.color} />
+            ) : 'hollow' in item && item.hollow ? (
+              <span
+                className="w-3 h-3 rounded-full mr-2.5 flex-shrink-0 border-2"
+                style={{ borderColor: item.color, backgroundColor: '#fff' }}
+              />
             ) : (
               <span
                 className="w-3 h-3 rounded-full mr-2.5 flex-shrink-0 shadow-sm"

@@ -9,6 +9,7 @@ export interface DependencyNode {
   children: string[];
   parents: string[];
   hasConflict: boolean;
+  isAgpInternal: boolean;   // from _agp_internal_javaPreCompile* configurations
   conflictVersions?: string[];
 }
 

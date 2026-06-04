@@ -9,16 +9,26 @@ export function parseGradleDependencies(text: string): ParsedGraph {
 
   const stack: { id: string; level: number }[] = [];
 
-  // Only process debugCompileClasspath and releaseCompileClasspath
-  const TARGET_CONFIGS = new Set(['debugCompileClasspath', 'releaseCompileClasspath']);
+  // Target: runtime classpath + AGP internal pre-compile classpath
+  const TARGET_CONFIGS = new Set(['debugRuntimeClasspath', 'releaseRuntimeClasspath']);
   let inTargetConfig = false;
+  let isAgpInternal = false;
 
   for (const line of lines) {
-    // Detect configuration headers like "debugCompileClasspath - Compile classpath for /debug."
+    // Detect standard configuration headers like "debugRuntimeClasspath - Runtime classpath of /debug."
     const configMatch = line.match(/^(\S+)\s+-\s+/);
     if (configMatch) {
       inTargetConfig = TARGET_CONFIGS.has(configMatch[1]);
-      stack.length = 0; // Reset stack when switching configurations
+      isAgpInternal = false;
+      stack.length = 0;
+      continue;
+    }
+
+    // Detect AGP internal configuration headers like "_agp_internal_javaPreCompileDebug_kaptClasspath"
+    if (/^_agp_internal_javaPreCompile/.test(line)) {
+      inTargetConfig = true;
+      isAgpInternal = true;
+      stack.length = 0;
       continue;
     }
 
@@ -52,6 +62,7 @@ export function parseGradleDependencies(text: string): ParsedGraph {
         children: [],
         parents: [],
         hasConflict: false,
+        isAgpInternal: isAgpInternal,
       });
     }
 
