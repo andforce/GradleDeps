@@ -6,8 +6,8 @@ on:
   workflow_dispatch:
 
 env:
-  DOMAIN: deps.aimfor.top
-  WEB_ROOT: /var/www/deps.aimfor.top
+  DOMAIN: gradledeps.com
+  WEB_ROOT: /var/www/gradledeps.com
 
 jobs:
   build-and-deploy:
