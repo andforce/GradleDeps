@@ -39,7 +39,7 @@ export function parseGradleDependencies(text: string): ParsedGraph {
     const { name, version, declaredVersion, level, isConstraint } = parsed;
     const id = version ? `${name}:${version}` : name;
 
-    if (version) {
+    if (version && !isAgpInternal) {
       const baseId = name;
       if (!conflictMap.has(baseId)) {
         conflictMap.set(baseId, new Set());
